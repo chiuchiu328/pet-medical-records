@@ -4,10 +4,157 @@ from pathlib import Path
 from typing import Any
 
 from fastapi.encoders import jsonable_encoder
+from pydantic import BaseModel, Field
 
 from app import schemas, services
 from app.config import Settings
 from app.database import Database
+
+
+class MCPGetPetArgs(BaseModel):
+    pet_id: int = Field(description="Existing pet id.")
+    include_deleted: bool = Field(default=False)
+
+
+class MCPUpdatePetArgs(schemas.PetUpdate):
+    pet_id: int = Field(description="Existing pet id to update.")
+
+
+class MCPDeletePetArgs(BaseModel):
+    pet_id: int = Field(description="Existing pet id.")
+    reason: str | None = None
+    confirm_token: str | None = None
+
+
+class MCPRestorePetArgs(BaseModel):
+    pet_id: int = Field(description="Existing soft-deleted pet id.")
+    confirm_token: str | None = None
+
+
+class MCPCreateMedicalRecordArgs(schemas.MedicalRecordCreate):
+    pet_id: int = Field(description="Existing pet id that owns this medical record.")
+
+
+class MCPSearchMedicalRecordsArgs(BaseModel):
+    pet_id: int = Field(description="Existing pet id to search within.")
+    start: str | None = None
+    end: str | None = None
+    keyword: str | None = None
+    tag: str | None = None
+    category: schemas.AttachmentCategory | None = None
+    include_deleted: bool = False
+    sort: str = "visit_at_desc"
+    limit: int | None = 100
+    page: int | None = 1
+
+
+class MCPGetMedicalRecordArgs(BaseModel):
+    record_id: int = Field(description="Existing medical record id.")
+    include_deleted: bool = False
+
+
+class MCPUpdateMedicalRecordArgs(schemas.MedicalRecordUpdate):
+    record_id: int = Field(description="Existing medical record id to update.")
+
+
+class MCPDeleteMedicalRecordArgs(BaseModel):
+    record_id: int = Field(description="Existing medical record id.")
+    reason: str | None = None
+    confirm_token: str | None = None
+
+
+class MCPRestoreMedicalRecordArgs(BaseModel):
+    record_id: int = Field(description="Existing soft-deleted medical record id.")
+    confirm_token: str | None = None
+
+
+class MCPCreateDailyLogArgs(schemas.DailyLogCreate):
+    pet_id: int = Field(description="Existing pet id that owns this daily log.")
+
+
+class MCPSearchDailyLogsArgs(BaseModel):
+    pet_id: int = Field(description="Existing pet id to search within.")
+    start: str | None = None
+    end: str | None = None
+    keyword: str | None = None
+    tag: str | None = None
+    appetite: schemas.Appetite | None = None
+    energy: schemas.Energy | None = None
+    category: schemas.AttachmentCategory | None = None
+    include_deleted: bool = False
+    sort: str = "logged_at_desc"
+    limit: int | None = 100
+    page: int | None = 1
+
+
+class MCPGetDailyLogArgs(BaseModel):
+    log_id: int = Field(description="Existing daily log id.")
+    include_deleted: bool = False
+
+
+class MCPUpdateDailyLogArgs(schemas.DailyLogUpdate):
+    log_id: int = Field(description="Existing daily log id to update.")
+
+
+class MCPDeleteDailyLogArgs(BaseModel):
+    log_id: int = Field(description="Existing daily log id.")
+    reason: str | None = None
+    confirm_token: str | None = None
+
+
+class MCPRestoreDailyLogArgs(BaseModel):
+    log_id: int = Field(description="Existing soft-deleted daily log id.")
+    confirm_token: str | None = None
+
+
+class MCPAttachMedicalRecordMediaArgs(schemas.AttachmentCreate):
+    record_id: int = Field(description="Existing medical record id.")
+    file_path: str = Field(description="Absolute local file path visible to the MCP server.")
+
+
+class MCPAttachDailyLogMediaArgs(schemas.AttachmentCreate):
+    log_id: int = Field(description="Existing daily log id.")
+    file_path: str = Field(description="Absolute local file path visible to the MCP server.")
+
+
+class MCPGetAttachmentArgs(BaseModel):
+    attachment_id: int = Field(description="Existing attachment id.")
+    include_deleted: bool = False
+
+
+class MCPUpdateAttachmentArgs(schemas.AttachmentUpdate):
+    attachment_id: int = Field(description="Existing attachment id to update.")
+
+
+class MCPDeleteAttachmentArgs(BaseModel):
+    attachment_id: int = Field(description="Existing attachment id.")
+    reason: str | None = None
+    confirm_token: str | None = None
+
+
+class MCPRestoreAttachmentArgs(BaseModel):
+    attachment_id: int = Field(description="Existing soft-deleted attachment id.")
+    confirm_token: str | None = None
+
+
+class MCPPetTimelineArgs(BaseModel):
+    pet_id: int = Field(description="Existing pet id to inspect.")
+    start: str | None = None
+    end: str | None = None
+    keyword: str | None = None
+    event_type: str = "all"
+    category: schemas.AttachmentCategory | None = None
+    include_deleted: bool = False
+    sort: str = "desc"
+    limit: int | None = 100
+    page: int | None = 1
+
+
+class MCPSummarizePetStatusArgs(BaseModel):
+    pet_id: int = Field(description="Existing pet id to summarize.")
+    start: str | None = None
+    end: str | None = None
+    include_deleted: bool = False
 
 
 class MCPToolLayer:
@@ -19,40 +166,56 @@ class MCPToolLayer:
 
     def list_tools(self) -> list[dict[str, Any]]:
         return [
-            self._tool("create_pet", "Create a pet profile."),
+            self._tool(
+                "create_pet",
+                "Create a new pet profile. Do not send pet_id; the database generates id automatically. Supported fields: name, species, breed, sex, birth_date, microchip_number, notes.",
+                schemas.PetCreate,
+            ),
             self._tool("list_pets", "List pets, optionally including soft-deleted pets."),
-            self._tool("get_pet", "Get a pet by id."),
-            self._tool("update_pet", "Update a pet profile."),
-            self._tool("delete_pet_preview", "Preview pet soft delete impact and return a confirm token."),
-            self._tool("delete_pet", "Soft delete a pet."),
-            self._tool("restore_pet_preview", "Preview pet restore impact and return a confirm token."),
-            self._tool("restore_pet", "Restore a soft-deleted pet."),
-            self._tool("create_medical_record", "Create a medical record for a pet."),
-            self._tool("search_medical_records", "Search medical records by pet, time, keyword, tag, or attachment category."),
-            self._tool("get_medical_record", "Get a medical record by id."),
-            self._tool("update_medical_record", "Update a medical record."),
-            self._tool("delete_medical_record_preview", "Preview medical record soft delete impact and return a confirm token."),
-            self._tool("delete_medical_record", "Soft delete a medical record."),
-            self._tool("restore_medical_record_preview", "Preview medical record restore impact and return a confirm token."),
-            self._tool("restore_medical_record", "Restore a soft-deleted medical record."),
-            self._tool("create_daily_log", "Create a daily log for a pet."),
-            self._tool("search_daily_logs", "Search daily logs by pet, time, keyword, state, tag, or attachment category."),
-            self._tool("get_daily_log", "Get a daily log by id."),
-            self._tool("update_daily_log", "Update a daily log."),
-            self._tool("delete_daily_log_preview", "Preview daily log soft delete impact and return a confirm token."),
-            self._tool("delete_daily_log", "Soft delete a daily log."),
-            self._tool("restore_daily_log_preview", "Preview daily log restore impact and return a confirm token."),
-            self._tool("restore_daily_log", "Restore a soft-deleted daily log."),
-            self._tool("attach_media_to_medical_record", "Attach a local file path to a medical record."),
-            self._tool("attach_media_to_daily_log", "Attach a local file path to a daily log."),
-            self._tool("get_attachment", "Get attachment metadata."),
-            self._tool("update_attachment", "Update attachment metadata, category, note, or manual OCR text."),
-            self._tool("delete_attachment_preview", "Preview attachment soft delete impact and return a confirm token."),
-            self._tool("delete_attachment", "Soft delete an attachment."),
-            self._tool("restore_attachment_preview", "Preview attachment restore impact and return a confirm token."),
-            self._tool("restore_attachment", "Restore a soft-deleted attachment."),
-            self._tool("get_pet_timeline", "Get a unified medical/daily timeline for a pet."),
-            self._tool("summarize_pet_status", "Return a lightweight structured summary for a pet."),
+            self._tool("get_pet", "Get a pet by id.", MCPGetPetArgs),
+            self._tool(
+                "update_pet",
+                "Update an existing pet profile. Requires an existing pet_id.",
+                MCPUpdatePetArgs,
+            ),
+            self._tool("delete_pet_preview", "Preview pet soft delete impact and return a confirm token.", MCPGetPetArgs),
+            self._tool("delete_pet", "Soft delete a pet. Requires an existing pet_id and confirm_token from delete_pet_preview.", MCPDeletePetArgs),
+            self._tool("restore_pet_preview", "Preview pet restore impact and return a confirm token.", MCPGetPetArgs),
+            self._tool("restore_pet", "Restore a soft-deleted pet. Requires pet_id and confirm_token from restore_pet_preview.", MCPRestorePetArgs),
+            self._tool(
+                "create_medical_record",
+                "Create a medical record for an existing pet. Requires pet_id of an already-created pet plus visit_at. Use create_pet first if the pet does not exist yet.",
+                MCPCreateMedicalRecordArgs,
+            ),
+            self._tool("search_medical_records", "Search medical records by pet, time, keyword, tag, or attachment category.", MCPSearchMedicalRecordsArgs),
+            self._tool("get_medical_record", "Get a medical record by id.", MCPGetMedicalRecordArgs),
+            self._tool("update_medical_record", "Update a medical record.", MCPUpdateMedicalRecordArgs),
+            self._tool("delete_medical_record_preview", "Preview medical record soft delete impact and return a confirm token.", MCPGetMedicalRecordArgs),
+            self._tool("delete_medical_record", "Soft delete a medical record.", MCPDeleteMedicalRecordArgs),
+            self._tool("restore_medical_record_preview", "Preview medical record restore impact and return a confirm token.", MCPGetMedicalRecordArgs),
+            self._tool("restore_medical_record", "Restore a soft-deleted medical record.", MCPRestoreMedicalRecordArgs),
+            self._tool(
+                "create_daily_log",
+                "Create a daily log for an existing pet. Requires pet_id of an already-created pet plus logged_at. Use create_pet first if the pet does not exist yet.",
+                MCPCreateDailyLogArgs,
+            ),
+            self._tool("search_daily_logs", "Search daily logs by pet, time, keyword, state, tag, or attachment category.", MCPSearchDailyLogsArgs),
+            self._tool("get_daily_log", "Get a daily log by id.", MCPGetDailyLogArgs),
+            self._tool("update_daily_log", "Update a daily log.", MCPUpdateDailyLogArgs),
+            self._tool("delete_daily_log_preview", "Preview daily log soft delete impact and return a confirm token.", MCPGetDailyLogArgs),
+            self._tool("delete_daily_log", "Soft delete a daily log.", MCPDeleteDailyLogArgs),
+            self._tool("restore_daily_log_preview", "Preview daily log restore impact and return a confirm token.", MCPGetDailyLogArgs),
+            self._tool("restore_daily_log", "Restore a soft-deleted daily log.", MCPRestoreDailyLogArgs),
+            self._tool("attach_media_to_medical_record", "Attach a local file path to a medical record.", MCPAttachMedicalRecordMediaArgs),
+            self._tool("attach_media_to_daily_log", "Attach a local file path to a daily log.", MCPAttachDailyLogMediaArgs),
+            self._tool("get_attachment", "Get attachment metadata.", MCPGetAttachmentArgs),
+            self._tool("update_attachment", "Update attachment metadata, category, note, or manual OCR text.", MCPUpdateAttachmentArgs),
+            self._tool("delete_attachment_preview", "Preview attachment soft delete impact and return a confirm token.", MCPGetAttachmentArgs),
+            self._tool("delete_attachment", "Soft delete an attachment.", MCPDeleteAttachmentArgs),
+            self._tool("restore_attachment_preview", "Preview attachment restore impact and return a confirm token.", MCPGetAttachmentArgs),
+            self._tool("restore_attachment", "Restore a soft-deleted attachment.", MCPRestoreAttachmentArgs),
+            self._tool("get_pet_timeline", "Get a unified medical/daily timeline for a pet.", MCPPetTimelineArgs),
+            self._tool("summarize_pet_status", "Return a lightweight structured summary for a pet.", MCPSummarizePetStatusArgs),
         ]
 
     def call_tool(self, name: str, arguments: dict[str, Any] | None = None) -> Any:
@@ -103,6 +266,10 @@ class MCPToolLayer:
             )
 
         if name == "create_medical_record":
+            if "pet_id" not in arguments:
+                raise services.InvalidRequest(
+                    "create_medical_record requires pet_id. Create the pet first with create_pet, then pass the returned pet id."
+                )
             pet_id = arguments.pop("pet_id")
             record = services.create_medical_record(
                 db,
@@ -160,6 +327,10 @@ class MCPToolLayer:
             return services.medical_record_to_read(db, record)
 
         if name == "create_daily_log":
+            if "pet_id" not in arguments:
+                raise services.InvalidRequest(
+                    "create_daily_log requires pet_id. Create the pet first with create_pet, then pass the returned pet id."
+                )
             pet_id = arguments.pop("pet_id")
             log = services.create_daily_log(db, pet_id, schemas.DailyLogCreate(**arguments))
             return services.daily_log_to_read(db, log)
@@ -291,12 +462,14 @@ class MCPToolLayer:
         return services.attachment_to_read(attachment, db)
 
     @staticmethod
-    def _tool(name: str, description: str) -> dict[str, Any]:
+    def _tool(name: str, description: str, schema_model: type[BaseModel] | None = None) -> dict[str, Any]:
+        input_schema = (
+            schema_model.model_json_schema()
+            if schema_model is not None
+            else {"type": "object", "additionalProperties": True}
+        )
         return {
             "name": name,
             "description": description,
-            "inputSchema": {
-                "type": "object",
-                "additionalProperties": True,
-            },
+            "inputSchema": input_schema,
         }

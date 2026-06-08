@@ -142,6 +142,7 @@
 - `docs/API.md`：第一版 API / MCP 規格
 - `docs/scenario.md`：使用情境與 use case
 - `docs/softwareArchitecture.md`：軟體架構草稿
+- `docs/runtimeEnvironment.md`：Hermes 執行環境、資料持久化與 MCP 掛法建議
 
 ## 第一版實作與執行
 

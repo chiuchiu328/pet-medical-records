@@ -57,11 +57,13 @@ def main() -> None:
     for line in sys.stdin:
         if not line.strip():
             continue
+        request_id = None
         try:
             request = json.loads(line)
+            request_id = request.get("id")
             response = handle_request(layer, request)
         except Exception as exc:  # noqa: BLE001 - stdio servers must return structured errors.
-            response = _error(None, -32000, str(exc))
+            response = _error(request_id, -32000, str(exc))
         print(json.dumps(response, ensure_ascii=False), flush=True)
 
 

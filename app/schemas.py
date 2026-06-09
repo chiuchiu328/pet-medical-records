@@ -176,6 +176,7 @@ class MediaAttachmentRead(BaseModel):
     category: AttachmentCategory
     file_name: str
     storage_path: str
+    local_file_path: str
     mime_type: str | None = None
     captured_at: datetime | None = None
     extracted_text: str | None = None

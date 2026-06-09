@@ -40,7 +40,13 @@ def test_pet_medical_daily_attachment_timeline_workflow(client, momo_pet):
     assert blood_attachment_response.status_code == 201
     blood_attachment = blood_attachment_response.json()
     assert blood_attachment["ocr_status"] == "manual"
-    assert Path(blood_attachment["storage_path"]).exists()
+    assert blood_attachment["storage_path"].startswith(f"medical_record/{record['id']}/")
+    assert not Path(blood_attachment["storage_path"]).is_absolute()
+    assert Path(blood_attachment["local_file_path"]).is_absolute()
+    assert Path(blood_attachment["local_file_path"]).exists()
+    assert Path(blood_attachment["local_file_path"]).samefile(
+        client.app.state.settings.upload_dir / blood_attachment["storage_path"]
+    )
 
     xray_attachment_response = client.post(
         f"/medical-records/{record['id']}/attachments",

@@ -21,7 +21,7 @@ Use this skill when the task involves the `pet-medical-records` MCP tools.
 - `attach_media_to_medical_record` requires `record_id`.
 - `attach_media_to_daily_log` requires `log_id`.
 - Attachment tools use `file_path`; the file must be visible inside the runtime container.
-- If the user asks to send an attached image back into chat, return `MEDIA:<storage_path>` using the attachment's real local file path visible to Hermes.
+- If the user asks to send an attached image back into chat, do not say you lack the tool. Fetch the attachment metadata and return a `MEDIA:` line.
 
 ## Safe workflow
 
@@ -42,15 +42,32 @@ Use this skill when the task involves the `pet-medical-records` MCP tools.
 - Put health history, medication, and symptom details into a medical record or daily log when needed.
 - Use media categories intentionally: `blood_test`, `xray`, `ultrasound`, `prescription`, `note`, `daily`, `other`.
 - If the user provides age instead of `birth_date`, ask for a date or clearly infer and state the assumption before writing.
+- For attachments, prefer `local_file_path` for media return. `storage_path` is stored metadata and may be relative.
 
 ## Deletion rules
 
 - Delete and restore use preview + confirm token.
 - Call `*_preview` first, then pass `confirm_token` into the actual delete or restore tool.
 
+## Image return format
+
+- For an existing attachment image, final reply must include a standalone line:
+  `MEDIA:<absolute_file_path>`
+- Prefer absolute path in final output.
+- Use attachment `local_file_path` directly when available.
+- You may add one short sentence before or after the `MEDIA:` line.
+- Do not reply with only prose like "photo is preserved" or "I cannot send images".
+
+Example:
+
+```text
+這是剛剛那張照片。
+MEDIA:/opt/data/pet-medical-records-data/uploads/daily_log/3/example.jpg
+```
+
 ## Good behavior
 
 - Prefer `list_pets` or `get_pet` before creating related records if pet identity is unclear.
 - Reuse ids returned by tools; do not invent ids.
 - If a required id is missing, stop and resolve it instead of guessing.
-- When sending an existing attachment image to the user, fetch the attachment metadata first and use its `storage_path` in a `MEDIA:` line instead of only describing the file in prose.
+- When sending an existing attachment image to the user, fetch the attachment metadata first and use `local_file_path` in the `MEDIA:` line.

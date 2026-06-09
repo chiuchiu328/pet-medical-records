@@ -77,6 +77,7 @@
 - category (blood_test / xray / ultrasound / prescription / note / daily / other)
 - file_name
 - storage_path
+- local_file_path
 - mime_type
 - captured_at (nullable)
 - extracted_text (nullable)
@@ -319,6 +320,10 @@ Restore：
 
 #### GET /attachments/{attachment_id}
 取得附件 metadata。
+
+補充：
+- `storage_path` 為儲存中的 metadata 路徑，可能是相對路徑
+- `local_file_path` 為 server 解析後的絕對本機路徑，適合 agent 需要以 `MEDIA:<path>` 形式回傳圖片或影片到聊天平台時使用
 
 Query：
 - include_deleted=false

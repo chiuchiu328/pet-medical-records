@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from app.config import Settings
+from app.models import MediaAttachment
 from app.mcp.tool_layer import MCPToolLayer
-from app.services import ResourceNotFound
+from app.services import ResourceNotFound, _resolved_attachment_local_file_path
 
 
 def test_mcp_tool_layer_supports_agent_first_workflow(tmp_path):
@@ -57,6 +60,10 @@ def test_mcp_tool_layer_supports_agent_first_workflow(tmp_path):
     )
     assert attachment["category"] == "blood_test"
     assert attachment["ocr_status"] == "manual"
+    assert attachment["storage_path"].startswith(f"medical_record/{record['id']}/")
+    assert Path(attachment["local_file_path"]).is_absolute()
+    assert Path(attachment["local_file_path"]).exists()
+    assert Path(attachment["local_file_path"]).samefile(tmp_path / "uploads" / attachment["storage_path"])
 
     log = layer.call_tool(
         "create_daily_log",
@@ -180,3 +187,66 @@ def test_mcp_tool_layer_update_get_delete_and_missing_attachment_path(tmp_path):
         {"log_id": log["id"], "include_deleted": True},
     )
     assert included["delete_reason"] == "重複的用藥紀錄"
+
+
+def test_resolved_attachment_local_file_path_uses_upload_dir_relative_storage_path():
+    resolved = _resolved_attachment_local_file_path(
+        "daily_log/3/example.jpg",
+        settings=Settings(
+            database_url="sqlite:///unused.db",
+            upload_dir="/opt/data/pet-medical-records-data/uploads",
+        ),
+    )
+    assert resolved == "/opt/data/pet-medical-records-data/uploads/daily_log/3/example.jpg"
+
+
+def test_mcp_tool_layer_normalizes_legacy_storage_paths_on_init(tmp_path):
+    settings = Settings(
+        database_url=f"sqlite:///{tmp_path / 'mcp-legacy.db'}",
+        upload_dir=tmp_path / "uploads",
+    )
+    layer = MCPToolLayer(settings)
+    pet = layer.call_tool(
+        "create_pet",
+        {
+            "name": "摸摸",
+            "species": "cat",
+            "breed": "米克斯",
+            "sex": "female",
+            "birth_date": "2021-03-12",
+        },
+    )
+    record = layer.call_tool(
+        "create_medical_record",
+        {
+            "pet_id": pet["id"],
+            "visit_at": "2026-06-07T14:30:00+08:00",
+            "hospital_name": "安心動物醫院",
+            "doctor_name": "王醫師",
+            "diagnosis": "腸胃不適",
+            "prescription": "patros 50mg bid",
+        },
+    )
+
+    legacy_file = tmp_path / "uploads" / "medical_record" / str(record["id"]) / "legacy.jpg"
+    legacy_file.parent.mkdir(parents=True, exist_ok=True)
+    legacy_file.write_bytes(b"legacy-image")
+
+    with layer.database.SessionLocal() as db:
+        attachment = MediaAttachment(
+            owner_type="medical_record",
+            owner_id=record["id"],
+            media_type="image",
+            category="blood_test",
+            file_name="legacy.jpg",
+            storage_path=f"uploads/medical_record/{record['id']}/legacy.jpg",
+            mime_type="image/jpeg",
+        )
+        db.add(attachment)
+        db.commit()
+        attachment_id = attachment.id
+
+    reloaded_layer = MCPToolLayer(settings)
+    attachment = reloaded_layer.call_tool("get_attachment", {"attachment_id": attachment_id})
+    assert attachment["storage_path"] == f"medical_record/{record['id']}/legacy.jpg"
+    assert attachment["local_file_path"] == str(legacy_file.resolve())

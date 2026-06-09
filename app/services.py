@@ -667,6 +667,21 @@ def _normalized_ocr_status(payload: schemas.AttachmentCreate | schemas.Attachmen
     return status or "none"
 
 
+def _normalized_attachment_storage_path(
+    storage_path: str,
+    *,
+    settings: Settings,
+) -> str:
+    upload_root = settings.upload_dir.expanduser().resolve(strict=False)
+    candidate = Path(storage_path).expanduser()
+    if candidate.is_absolute():
+        resolved = candidate.resolve(strict=False)
+        return resolved.relative_to(upload_root).as_posix()
+    if candidate.parts and candidate.parts[0] == upload_root.name:
+        candidate = Path(*candidate.parts[1:])
+    return candidate.as_posix()
+
+
 def create_attachment_from_fileobj(
     db: Session,
     settings: Settings,
@@ -684,7 +699,7 @@ def create_attachment_from_fileobj(
         owner_type=owner_type,
         owner_id=owner_id,
         file_name=stored_path.name,
-        storage_path=str(stored_path),
+        storage_path=_normalized_attachment_storage_path(str(stored_path), settings=settings),
         mime_type=mime_type or mimetypes.guess_type(file_name)[0] or "application/octet-stream",
         media_type=payload.media_type,
         category=payload.category,
@@ -714,7 +729,7 @@ def create_attachment_from_path(
         owner_type=owner_type,
         owner_id=owner_id,
         file_name=stored_path.name,
-        storage_path=str(stored_path),
+        storage_path=_normalized_attachment_storage_path(str(stored_path), settings=settings),
         mime_type=mimetypes.guess_type(source_path.name)[0] or "application/octet-stream",
         media_type=payload.media_type,
         category=payload.category,
@@ -1010,11 +1025,46 @@ def pet_to_read(pet: Pet) -> schemas.PetRead:
     return schemas.PetRead(**data)
 
 
+def _resolved_attachment_local_file_path(
+    storage_path: str,
+    *,
+    settings: Settings | None = None,
+) -> str:
+    runtime_settings = settings or Settings.from_env()
+    upload_root = runtime_settings.upload_dir.expanduser().resolve(strict=False)
+    resolved = upload_root / Path(storage_path).expanduser()
+    return str(resolved.resolve(strict=False))
+
+
+def normalize_attachment_storage_paths(db: Session, settings: Settings) -> int:
+    updated = 0
+    for attachment in db.scalars(select(MediaAttachment)).all():
+        normalized = _normalized_attachment_storage_path(attachment.storage_path, settings=settings)
+        if attachment.storage_path == normalized:
+            continue
+        attachment.storage_path = normalized
+        attachment.updated_at = utc_now()
+        db.add(attachment)
+        updated += 1
+    if updated:
+        db.commit()
+    return updated
+
+
 def attachment_to_read(
     attachment: MediaAttachment,
     db: Session | None = None,
+    settings: Settings | None = None,
 ) -> schemas.MediaAttachmentRead:
-    data = schemas.MediaAttachmentRead.model_validate(attachment).model_dump()
+    data = {
+        field_name: getattr(attachment, field_name)
+        for field_name in schemas.MediaAttachmentRead.model_fields
+        if hasattr(attachment, field_name)
+    }
+    data["local_file_path"] = _resolved_attachment_local_file_path(
+        attachment.storage_path,
+        settings=settings,
+    )
     if db is None:
         visibility = schemas.VisibilityInfo(deleted=attachment.deleted_at is not None)
     else:
@@ -1028,11 +1078,12 @@ def medical_record_to_read(
     record: MedicalRecord,
     *,
     include_deleted_attachments: bool = False,
+    settings: Settings | None = None,
 ) -> schemas.MedicalRecordRead:
     data = schemas.MedicalRecordRead.model_validate(record).model_dump()
     data["visibility"] = build_medical_record_visibility(db, record)
     data["attachments"] = [
-        attachment_to_read(attachment, db)
+        attachment_to_read(attachment, db, settings=settings)
         for attachment in list_attachments_for_owner(
             db,
             "medical_record",
@@ -1048,11 +1099,12 @@ def daily_log_to_read(
     log: DailyLog,
     *,
     include_deleted_attachments: bool = False,
+    settings: Settings | None = None,
 ) -> schemas.DailyLogRead:
     data = schemas.DailyLogRead.model_validate(log).model_dump()
     data["visibility"] = build_daily_log_visibility(db, log)
     data["attachments"] = [
-        attachment_to_read(attachment, db)
+        attachment_to_read(attachment, db, settings=settings)
         for attachment in list_attachments_for_owner(
             db,
             "daily_log",

@@ -163,6 +163,8 @@ class MCPToolLayer:
         self.settings.upload_dir.mkdir(parents=True, exist_ok=True)
         self.database = database or Database(self.settings.database_url)
         self.database.create_all()
+        with self.database.SessionLocal() as db:
+            services.normalize_attachment_storage_paths(db, self.settings)
 
     def list_tools(self) -> list[dict[str, Any]]:
         return [
@@ -276,7 +278,7 @@ class MCPToolLayer:
                 pet_id,
                 schemas.MedicalRecordCreate(**arguments),
             )
-            return services.medical_record_to_read(db, record)
+            return services.medical_record_to_read(db, record, settings=self.settings)
         if name == "search_medical_records":
             records = services.search_medical_records(db, **arguments)
             return [
@@ -284,6 +286,7 @@ class MCPToolLayer:
                     db,
                     record,
                     include_deleted_attachments=arguments.get("include_deleted", False),
+                    settings=self.settings,
                 )
                 for record in records
             ]
@@ -297,6 +300,7 @@ class MCPToolLayer:
                 db,
                 record,
                 include_deleted_attachments=arguments.get("include_deleted", False),
+                settings=self.settings,
             )
         if name == "update_medical_record":
             record_id = arguments.pop("record_id")
@@ -305,7 +309,7 @@ class MCPToolLayer:
                 record_id,
                 schemas.MedicalRecordUpdate(**arguments),
             )
-            return services.medical_record_to_read(db, record)
+            return services.medical_record_to_read(db, record, settings=self.settings)
         if name == "delete_medical_record_preview":
             return services.build_delete_preview_medical_record(db, arguments["record_id"])
         if name == "delete_medical_record":
@@ -315,7 +319,7 @@ class MCPToolLayer:
                 arguments.get("reason"),
                 arguments.get("confirm_token"),
             )
-            return services.medical_record_to_read(db, record)
+            return services.medical_record_to_read(db, record, settings=self.settings)
         if name == "restore_medical_record_preview":
             return services.build_restore_preview_medical_record(db, arguments["record_id"])
         if name == "restore_medical_record":
@@ -324,7 +328,7 @@ class MCPToolLayer:
                 arguments["record_id"],
                 arguments.get("confirm_token"),
             )
-            return services.medical_record_to_read(db, record)
+            return services.medical_record_to_read(db, record, settings=self.settings)
 
         if name == "create_daily_log":
             if "pet_id" not in arguments:
@@ -333,7 +337,7 @@ class MCPToolLayer:
                 )
             pet_id = arguments.pop("pet_id")
             log = services.create_daily_log(db, pet_id, schemas.DailyLogCreate(**arguments))
-            return services.daily_log_to_read(db, log)
+            return services.daily_log_to_read(db, log, settings=self.settings)
         if name == "search_daily_logs":
             logs = services.search_daily_logs(db, **arguments)
             return [
@@ -341,6 +345,7 @@ class MCPToolLayer:
                     db,
                     log,
                     include_deleted_attachments=arguments.get("include_deleted", False),
+                    settings=self.settings,
                 )
                 for log in logs
             ]
@@ -354,11 +359,12 @@ class MCPToolLayer:
                 db,
                 log,
                 include_deleted_attachments=arguments.get("include_deleted", False),
+                settings=self.settings,
             )
         if name == "update_daily_log":
             log_id = arguments.pop("log_id")
             log = services.update_daily_log(db, log_id, schemas.DailyLogUpdate(**arguments))
-            return services.daily_log_to_read(db, log)
+            return services.daily_log_to_read(db, log, settings=self.settings)
         if name == "delete_daily_log_preview":
             return services.build_delete_preview_daily_log(db, arguments["log_id"])
         if name == "delete_daily_log":
@@ -368,7 +374,7 @@ class MCPToolLayer:
                 arguments.get("reason"),
                 arguments.get("confirm_token"),
             )
-            return services.daily_log_to_read(db, log)
+            return services.daily_log_to_read(db, log, settings=self.settings)
         if name == "restore_daily_log_preview":
             return services.build_restore_preview_daily_log(db, arguments["log_id"])
         if name == "restore_daily_log":
@@ -377,7 +383,7 @@ class MCPToolLayer:
                 arguments["log_id"],
                 arguments.get("confirm_token"),
             )
-            return services.daily_log_to_read(db, log)
+            return services.daily_log_to_read(db, log, settings=self.settings)
 
         if name == "attach_media_to_medical_record":
             record_id = arguments.pop("record_id")
@@ -403,12 +409,14 @@ class MCPToolLayer:
                     include_deleted=arguments.get("include_deleted", False),
                 ),
                 db,
+                settings=self.settings,
             )
         if name == "update_attachment":
             attachment_id = arguments.pop("attachment_id")
             return services.attachment_to_read(
                 services.update_attachment(db, attachment_id, schemas.AttachmentUpdate(**arguments)),
                 db,
+                settings=self.settings,
             )
         if name == "delete_attachment_preview":
             return services.build_delete_preview_attachment(db, arguments["attachment_id"])
@@ -421,6 +429,7 @@ class MCPToolLayer:
                     arguments.get("confirm_token"),
                 ),
                 db,
+                settings=self.settings,
             )
         if name == "restore_attachment_preview":
             return services.build_restore_preview_attachment(db, arguments["attachment_id"])
@@ -432,6 +441,7 @@ class MCPToolLayer:
                     arguments.get("confirm_token"),
                 ),
                 db,
+                settings=self.settings,
             )
 
         if name == "get_pet_timeline":
@@ -459,7 +469,7 @@ class MCPToolLayer:
             source_path=file_path,
             payload=payload,
         )
-        return services.attachment_to_read(attachment, db)
+        return services.attachment_to_read(attachment, db, settings=self.settings)
 
     @staticmethod
     def _tool(name: str, description: str, schema_model: type[BaseModel] | None = None) -> dict[str, Any]:

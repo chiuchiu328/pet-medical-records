@@ -98,9 +98,10 @@ def create_medical_record(
     pet_id: int,
     payload: schemas.MedicalRecordCreate,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> schemas.MedicalRecordRead:
     record = services.create_medical_record(db, pet_id, payload)
-    return services.medical_record_to_read(db, record)
+    return services.medical_record_to_read(db, record, settings=settings)
 
 
 @router.get("/pets/{pet_id}/medical-records", response_model=list[schemas.MedicalRecordRead])
@@ -116,6 +117,7 @@ def search_medical_records(
     limit: int | None = 100,
     page: int | None = 1,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> list[schemas.MedicalRecordRead]:
     records = services.search_medical_records(
         db,
@@ -135,6 +137,7 @@ def search_medical_records(
             db,
             record,
             include_deleted_attachments=include_deleted,
+            settings=settings,
         )
         for record in records
     ]
@@ -145,12 +148,14 @@ def get_medical_record(
     record_id: int,
     include_deleted: bool = False,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> schemas.MedicalRecordRead:
     record = services.get_medical_record(db, record_id, include_deleted=include_deleted)
     return services.medical_record_to_read(
         db,
         record,
         include_deleted_attachments=include_deleted,
+        settings=settings,
     )
 
 
@@ -159,9 +164,10 @@ def update_medical_record(
     record_id: int,
     payload: schemas.MedicalRecordUpdate,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> schemas.MedicalRecordRead:
     record = services.update_medical_record(db, record_id, payload)
-    return services.medical_record_to_read(db, record)
+    return services.medical_record_to_read(db, record, settings=settings)
 
 
 @router.delete("/medical-records/{record_id}", response_model=schemas.MedicalRecordRead)
@@ -169,6 +175,7 @@ def delete_medical_record(
     record_id: int,
     payload: Annotated[schemas.DeleteConfirmRequest | None, Body()] = None,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> schemas.MedicalRecordRead:
     record = services.delete_medical_record(
         db,
@@ -176,7 +183,7 @@ def delete_medical_record(
         payload.reason if payload else None,
         payload.confirm_token if payload else None,
     )
-    return services.medical_record_to_read(db, record)
+    return services.medical_record_to_read(db, record, settings=settings)
 
 
 @router.post(
@@ -206,9 +213,10 @@ def restore_medical_record(
     record_id: int,
     payload: schemas.RestoreConfirmRequest,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> schemas.MedicalRecordRead:
     record = services.restore_medical_record(db, record_id, payload.confirm_token)
-    return services.medical_record_to_read(db, record)
+    return services.medical_record_to_read(db, record, settings=settings)
 
 
 @router.post("/pets/{pet_id}/daily-logs", response_model=schemas.DailyLogRead, status_code=201)
@@ -216,9 +224,10 @@ def create_daily_log(
     pet_id: int,
     payload: schemas.DailyLogCreate,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> schemas.DailyLogRead:
     log = services.create_daily_log(db, pet_id, payload)
-    return services.daily_log_to_read(db, log)
+    return services.daily_log_to_read(db, log, settings=settings)
 
 
 @router.get("/pets/{pet_id}/daily-logs", response_model=list[schemas.DailyLogRead])
@@ -236,6 +245,7 @@ def search_daily_logs(
     limit: int | None = 100,
     page: int | None = 1,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> list[schemas.DailyLogRead]:
     logs = services.search_daily_logs(
         db,
@@ -257,6 +267,7 @@ def search_daily_logs(
             db,
             log,
             include_deleted_attachments=include_deleted,
+            settings=settings,
         )
         for log in logs
     ]
@@ -267,9 +278,15 @@ def get_daily_log(
     log_id: int,
     include_deleted: bool = False,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> schemas.DailyLogRead:
     log = services.get_daily_log(db, log_id, include_deleted=include_deleted)
-    return services.daily_log_to_read(db, log, include_deleted_attachments=include_deleted)
+    return services.daily_log_to_read(
+        db,
+        log,
+        include_deleted_attachments=include_deleted,
+        settings=settings,
+    )
 
 
 @router.patch("/daily-logs/{log_id}", response_model=schemas.DailyLogRead)
@@ -277,9 +294,10 @@ def update_daily_log(
     log_id: int,
     payload: schemas.DailyLogUpdate,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> schemas.DailyLogRead:
     log = services.update_daily_log(db, log_id, payload)
-    return services.daily_log_to_read(db, log)
+    return services.daily_log_to_read(db, log, settings=settings)
 
 
 @router.delete("/daily-logs/{log_id}", response_model=schemas.DailyLogRead)
@@ -287,6 +305,7 @@ def delete_daily_log(
     log_id: int,
     payload: Annotated[schemas.DeleteConfirmRequest | None, Body()] = None,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> schemas.DailyLogRead:
     log = services.delete_daily_log(
         db,
@@ -294,7 +313,7 @@ def delete_daily_log(
         payload.reason if payload else None,
         payload.confirm_token if payload else None,
     )
-    return services.daily_log_to_read(db, log)
+    return services.daily_log_to_read(db, log, settings=settings)
 
 
 @router.post("/daily-logs/{log_id}/delete-preview", response_model=schemas.PreviewTokenResponse)
@@ -318,9 +337,10 @@ def restore_daily_log(
     log_id: int,
     payload: schemas.RestoreConfirmRequest,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> schemas.DailyLogRead:
     log = services.restore_daily_log(db, log_id, payload.confirm_token)
-    return services.daily_log_to_read(db, log)
+    return services.daily_log_to_read(db, log, settings=settings)
 
 
 def _attachment_payload(
@@ -376,7 +396,7 @@ def attach_media_to_medical_record(
             note=note,
         ),
     )
-    return services.attachment_to_read(attachment, db)
+    return services.attachment_to_read(attachment, db, settings=settings)
 
 
 @router.post(
@@ -413,7 +433,7 @@ def attach_media_to_daily_log(
             note=note,
         ),
     )
-    return services.attachment_to_read(attachment, db)
+    return services.attachment_to_read(attachment, db, settings=settings)
 
 
 @router.get("/attachments/{attachment_id}", response_model=schemas.MediaAttachmentRead)
@@ -421,10 +441,12 @@ def get_attachment(
     attachment_id: int,
     include_deleted: bool = False,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> schemas.MediaAttachmentRead:
     return services.attachment_to_read(
         services.get_attachment(db, attachment_id, include_deleted=include_deleted),
         db,
+        settings=settings,
     )
 
 
@@ -433,8 +455,13 @@ def update_attachment(
     attachment_id: int,
     payload: schemas.AttachmentUpdate,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> schemas.MediaAttachmentRead:
-    return services.attachment_to_read(services.update_attachment(db, attachment_id, payload), db)
+    return services.attachment_to_read(
+        services.update_attachment(db, attachment_id, payload),
+        db,
+        settings=settings,
+    )
 
 
 @router.delete("/attachments/{attachment_id}", response_model=schemas.MediaAttachmentRead)
@@ -442,6 +469,7 @@ def delete_attachment(
     attachment_id: int,
     payload: Annotated[schemas.DeleteConfirmRequest | None, Body()] = None,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> schemas.MediaAttachmentRead:
     return services.attachment_to_read(
         services.delete_attachment(
@@ -451,6 +479,7 @@ def delete_attachment(
             payload.confirm_token if payload else None,
         ),
         db,
+        settings=settings,
     )
 
 
@@ -478,10 +507,12 @@ def restore_attachment(
     attachment_id: int,
     payload: schemas.RestoreConfirmRequest,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> schemas.MediaAttachmentRead:
     return services.attachment_to_read(
         services.restore_attachment(db, attachment_id, payload.confirm_token),
         db,
+        settings=settings,
     )
 
 

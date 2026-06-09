@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from app.api.routes import router
 from app.config import Settings
 from app.database import Database
-from app.services import InvalidRequest, ResourceNotFound
+from app.services import InvalidRequest, ResourceNotFound, normalize_attachment_storage_paths
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -15,6 +15,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     database = Database(settings.database_url)
     database.create_all()
+    for db in database.session():
+        normalize_attachment_storage_paths(db, settings)
 
     app = FastAPI(title="Pet Medical Records", version="0.1.0")
     app.state.settings = settings

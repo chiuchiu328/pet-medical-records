@@ -21,6 +21,7 @@ Use this skill when the task involves the `pet-medical-records` MCP tools.
 - `attach_media_to_medical_record` requires `record_id`.
 - `attach_media_to_daily_log` requires `log_id`.
 - Attachment tools use `file_path`; the file must be visible inside the runtime container.
+- If the user asks to send an attached image back into chat, return `MEDIA:<storage_path>` using the attachment's real local file path visible to Hermes.
 
 ## Safe workflow
 
@@ -52,3 +53,4 @@ Use this skill when the task involves the `pet-medical-records` MCP tools.
 - Prefer `list_pets` or `get_pet` before creating related records if pet identity is unclear.
 - Reuse ids returned by tools; do not invent ids.
 - If a required id is missing, stop and resolve it instead of guessing.
+- When sending an existing attachment image to the user, fetch the attachment metadata first and use its `storage_path` in a `MEDIA:` line instead of only describing the file in prose.

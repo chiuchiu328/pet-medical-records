@@ -60,10 +60,13 @@ def test_mcp_tool_layer_supports_agent_first_workflow(tmp_path):
     )
     assert attachment["category"] == "blood_test"
     assert attachment["ocr_status"] == "manual"
-    assert attachment["storage_path"].startswith(f"medical_record/{record['id']}/")
+    assert "file_name" not in attachment
+    assert "storage_path" not in attachment
     assert Path(attachment["local_file_path"]).is_absolute()
     assert Path(attachment["local_file_path"]).exists()
-    assert Path(attachment["local_file_path"]).samefile(tmp_path / "uploads" / attachment["storage_path"])
+    assert Path(attachment["local_file_path"]).samefile(
+        tmp_path / "uploads" / "medical_record" / str(record["id"]) / Path(attachment["local_file_path"]).name
+    )
 
     log = layer.call_tool(
         "create_daily_log",
@@ -86,6 +89,9 @@ def test_mcp_tool_layer_supports_agent_first_workflow(tmp_path):
         {"pet_id": pet["id"], "keyword": "patros"},
     )
     assert [event["event_type"] for event in timeline] == ["daily", "medical"]
+    assert all("file_name" not in item for event in timeline for item in event["attachments"])
+    assert all("storage_path" not in item for event in timeline for item in event["attachments"])
+    assert all("local_file_path" in item for event in timeline for item in event["attachments"])
 
     summary = layer.call_tool("summarize_pet_status", {"pet_id": pet["id"]})
     assert summary["event_count"] == 2
@@ -248,5 +254,6 @@ def test_mcp_tool_layer_normalizes_legacy_storage_paths_on_init(tmp_path):
 
     reloaded_layer = MCPToolLayer(settings)
     attachment = reloaded_layer.call_tool("get_attachment", {"attachment_id": attachment_id})
-    assert attachment["storage_path"] == f"medical_record/{record['id']}/legacy.jpg"
+    assert "file_name" not in attachment
+    assert "storage_path" not in attachment
     assert attachment["local_file_path"] == str(legacy_file.resolve())

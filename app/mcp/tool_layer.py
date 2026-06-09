@@ -224,7 +224,7 @@ class MCPToolLayer:
         arguments = arguments or {}
         with self.database.SessionLocal() as db:
             result = self._dispatch(db, name, arguments)
-            return jsonable_encoder(result)
+            return self._sanitize_attachment_paths_for_agent(jsonable_encoder(result))
 
     def _dispatch(self, db, name: str, arguments: dict[str, Any]) -> Any:
         if name == "create_pet":
@@ -470,6 +470,22 @@ class MCPToolLayer:
             payload=payload,
         )
         return services.attachment_to_read(attachment, db, settings=self.settings)
+
+    @classmethod
+    def _sanitize_attachment_paths_for_agent(cls, payload: Any) -> Any:
+        if isinstance(payload, list):
+            return [cls._sanitize_attachment_paths_for_agent(item) for item in payload]
+        if not isinstance(payload, dict):
+            return payload
+
+        sanitized = {
+            key: cls._sanitize_attachment_paths_for_agent(value)
+            for key, value in payload.items()
+        }
+        if "local_file_path" in sanitized:
+            sanitized.pop("file_name", None)
+            sanitized.pop("storage_path", None)
+        return sanitized
 
     @staticmethod
     def _tool(name: str, description: str, schema_model: type[BaseModel] | None = None) -> dict[str, Any]:
